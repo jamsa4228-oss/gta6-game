@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/gta6-01/jamsa4228-oss/gta6-game/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 [![reward](https://make.fun/badge/gta6-01/jamsa4228-oss/gta6-game/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
-SOLMAR BAY — an open-world crime game in the spirit of GTA 6, built with three.js. Rico Vega owes fixer Marisol Kane $5,000. Drive a sunset coastal city, steal cars, dodge the cops through a 0–5 star wanted system, and run four story missions — from the first meeting at Marisol's office to the final payoff at the pier. On-foot and driving controls, traffic and pedestrians, a pistol, a minimap, synthesized WebAudio (engine, sirens, waves), and localStorage saves.
+SOLMAR BAY — a GTA-style story game in a sunset coastal city. Rico Vega owes fixer Marisol Kane $5,000, and four jobs clear the debt: pay her back a little, steal a sports car, lose a three-star wanted level, then deliver the car at the pier. Drive and run through a grid of streets, a beach and a pier; steal parked cars, dodge traffic and pedestrians, outrun the police, punch and shoot with a hitscan pistol, and watch the cash, wanted stars, health and minimap. Built in three.js 0.187.0 (loaded from the CDN), with a WebAudio synth soundtrack, a start screen, a localStorage save and four missions that chain into one story.
 
 ## Run it
 
@@ -12,7 +12,7 @@ SOLMAR BAY — an open-world crime game in the spirit of GTA 6, built with three
 node serve.ts
 ```
 
-Then open http://localhost:8080
+Then open http://localhost:8080.
 
 ---
 

@@ -1,107 +1,163 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:,">
-<title>SOLMAR BAY — Make GTA 6</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SOLMAR BAY — a GTA-style story in a sunset city</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #1a0f0a; font-family: 'Segoe UI', Arial, sans-serif; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-  .panel { background: rgba(10, 10, 16, 0.72); border: 1px solid rgba(255, 178, 90, 0.35); border-radius: 8px; color: #fff; }
-  #hud-top { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; gap: 12px; align-items: flex-start; pointer-events: none; z-index: 5; }
-  #hud-health { width: 240px; padding: 10px 12px; }
-  #hud-health .label { font-size: 11px; letter-spacing: 2px; color: #ffb25a; }
-  #hud-health-bar { height: 12px; background: #333; border-radius: 6px; margin-top: 5px; overflow: hidden; }
-  #hud-health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #7be495); border-radius: 6px; }
-  #hud-health-text { font-size: 12px; color: #ccc; margin-top: 4px; }
-  #hud-money-box { padding: 10px 14px; font-size: 20px; font-weight: 700; color: #7be495; }
-  #hud-debt { font-size: 12px; color: #ff9a7a; font-weight: 400; }
-  #hud-stars { margin-left: auto; padding: 10px 14px; font-size: 24px; letter-spacing: 4px; color: #555; }
-  #hud-mission-box { position: fixed; top: 86px; left: 50%; transform: translateX(-50%); max-width: 640px; text-align: center; padding: 8px 18px; pointer-events: none; z-index: 5; }
-  #hud-mission { font-size: 13px; letter-spacing: 2px; color: #ffd23e; font-weight: 700; }
-  #hud-objective { font-size: 14px; color: #fff; margin-top: 2px; }
-  #minimap { position: fixed; left: 12px; bottom: 12px; width: 180px; height: 180px; border: 2px solid rgba(255, 178, 90, 0.5); border-radius: 8px; background: #0d1420; z-index: 5; }
-  #hud-speed { position: fixed; right: 12px; bottom: 12px; padding: 10px 16px; font-size: 22px; font-weight: 700; color: #fff; z-index: 5; }
-  #hud-feed { position: fixed; left: 204px; bottom: 12px; max-width: 420px; font-size: 13px; line-height: 1.5; color: #ffe9c9; z-index: 5; text-shadow: 0 1px 3px #000; }
-  #hud-feed div { margin-top: 2px; }
-  #hud-keys { position: fixed; right: 12px; bottom: 64px; padding: 8px 12px; font-size: 11px; color: #ccc; line-height: 1.6; z-index: 5; }
-  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 4, 2, 0.72); z-index: 10; }
-  .card { max-width: 620px; width: 92%; padding: 36px 40px; text-align: center; background: rgba(16, 10, 8, 0.92); border: 1px solid rgba(255, 178, 90, 0.5); border-radius: 14px; color: #fff; }
-  .card h1 { font-size: 52px; letter-spacing: 6px; color: #ffb25a; text-shadow: 0 0 24px rgba(255, 150, 60, 0.6); }
-  .card h2 { font-size: 26px; color: #ffd23e; margin-bottom: 10px; }
-  .card p { font-size: 15px; line-height: 1.6; color: #eee; margin: 12px 0; }
-  .card .controls { font-size: 13px; line-height: 1.9; color: #ccc; margin: 16px 0; text-align: left; display: inline-block; }
-  .card .controls b { color: #ffd23e; }
-  button { cursor: pointer; font-size: 18px; font-weight: 700; letter-spacing: 2px; color: #1a0f0a; background: linear-gradient(180deg, #ffd23e, #ff9a3d); border: none; border-radius: 8px; padding: 14px 42px; margin-top: 10px; }
-  button:hover { filter: brightness(1.1); }
-  #err { position: fixed; top: 0; left: 0; right: 0; background: #a00; color: #fff; font-size: 13px; padding: 6px 10px; display: none; z-index: 50; }
-</style>
-<script type="importmap">
-{
-  "imports": {
-    "three": "./vendor/three/three.module.min.js"
+  :root {
+    color-scheme: dark;
+    --ink: #fff7e8;
+    --dim: #ffd9a0;
+    --accent: #ff9a3d;
+    --accent-2: #ff5e7a;
+    --panel: rgba(12, 8, 24, 0.78);
+    --line: rgba(255, 190, 110, 0.35);
   }
-}
-</script>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #1a0f2e; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; color: var(--ink); }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ---- HUD ---- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; display: none; }
+  #hud-top {
+    position: absolute; top: 14px; left: 14px; right: 14px;
+    display: flex; gap: 10px; align-items: flex-start; justify-content: space-between;
+  }
+  .pill {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 8px 14px; font-weight: 700; font-size: 17px; letter-spacing: 0.02em;
+    backdrop-filter: blur(4px);
+  }
+  #cash { color: #ffe08a; }
+  #wanted { color: #ffb3c1; min-width: 92px; text-align: center; }
+  #health { display: flex; align-items: center; gap: 8px; min-width: 170px; }
+  #health-fill {
+    display: inline-block; height: 10px; width: 110px; border-radius: 6px;
+    background: linear-gradient(90deg, #57e389, #2fbf71); transition: width 0.2s ease;
+  }
+  #mission {
+    position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 8px 16px; text-align: center; max-width: 46vw; backdrop-filter: blur(4px);
+  }
+  #mission-title { font-weight: 800; font-size: 16px; color: var(--dim); letter-spacing: 0.04em; }
+  #mission-objective { font-size: 13px; opacity: 0.9; margin-top: 2px; }
+  #minimap {
+    position: absolute; top: 64px; right: 14px; width: 168px; height: 168px;
+    border-radius: 12px; border: 1px solid var(--line); background: rgba(10, 6, 22, 0.82);
+  }
+  #prompt {
+    position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 16px; font-size: 15px; font-weight: 700; display: none;
+  }
+  #toast {
+    position: absolute; left: 50%; bottom: 148px; transform: translateX(-50%);
+    background: rgba(12, 8, 24, 0.88); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 16px; font-size: 15px; display: none; max-width: 70vw; text-align: center;
+  }
+  #crosshair {
+    position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+    margin: -11px 0 0 -11px; display: none;
+  }
+  #crosshair::before, #crosshair::after {
+    content: ""; position: absolute; background: rgba(255, 247, 232, 0.9);
+  }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { left: 0; top: 10px; width: 22px; height: 2px; }
+  #vignette {
+    position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(255, 30, 40, 0.5) 100%);
+    transition: opacity 0.15s ease;
+  }
+
+  /* ---- Overlays ---- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10; display: none;
+    align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(180deg, rgba(26, 12, 46, 0.55), rgba(10, 5, 22, 0.82));
+    padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+    padding: 28px 34px; max-width: 640px; width: 100%;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  }
+  .card h1 { margin: 0 0 6px; font-size: 44px; letter-spacing: 0.08em; color: var(--accent); }
+  .card h1 .bay { color: var(--accent-2); }
+  .card h2 { margin: 0 0 10px; font-size: 32px; letter-spacing: 0.05em; }
+  .card p { margin: 10px 0; font-size: 16px; line-height: 1.55; color: var(--ink); }
+  .card .sub { color: var(--dim); font-size: 14px; }
+  .controls { margin: 14px auto 4px; display: inline-block; text-align: left; font-size: 14px; line-height: 1.8; color: var(--dim); }
+  .controls b { color: var(--ink); }
+  .btn {
+    pointer-events: auto; cursor: pointer; border: 0; border-radius: 12px;
+    padding: 13px 26px; margin: 8px 6px 0; font-size: 17px; font-weight: 800;
+    color: #241005; background: linear-gradient(180deg, #ffc46b, #ff9a3d);
+    box-shadow: 0 6px 18px rgba(255, 154, 61, 0.45);
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.secondary { background: rgba(255, 247, 232, 0.14); color: var(--ink); box-shadow: none; border: 1px solid var(--line); }
+</style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="err"></div>
+<div id="status" aria-live="polite"></div>
 
-<div id="hud-top">
-  <div id="hud-health" class="panel">
-    <div class="label">HEALTH</div>
-    <div id="hud-health-bar"><div id="hud-health-fill"></div></div>
-    <div id="hud-health-text">100</div>
+<div id="hud">
+  <div id="hud-top">
+    <div class="pill" id="cash">$500</div>
+    <div class="pill" id="wanted">&#9734;&#9734;&#9734;&#9734;&#9734;</div>
+    <div class="pill" id="health"><span>Health</span><span id="health-fill"></span></div>
   </div>
-  <div id="hud-money-box" class="panel"><span id="hud-money">$0</span><br><span id="hud-debt">Debt: $5,000</span></div>
-  <div id="hud-stars" class="panel">☆☆☆☆☆</div>
+  <div id="mission">
+    <div id="mission-title">The Debt</div>
+    <div id="mission-objective">Rico owes Marisol Kane $5,000.</div>
+  </div>
+  <canvas id="minimap" width="168" height="168"></canvas>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="crosshair"></div>
+  <div id="vignette"></div>
 </div>
 
-<div id="hud-mission-box" class="panel">
-  <div id="hud-mission"></div>
-  <div id="hud-objective"></div>
-</div>
-
-<canvas id="minimap" width="180" height="180"></canvas>
-<div id="hud-speed" class="panel">0 km/h</div>
-<div id="hud-feed"></div>
-<div id="hud-keys" class="panel">WASD move &nbsp;·&nbsp; Shift run<br>E enter / exit car &nbsp;·&nbsp; F punch<br>Click shoot &nbsp;·&nbsp; Space handbrake<br>M mute &nbsp;·&nbsp; P pause</div>
-
-<div id="screen-start" class="overlay">
+<div class="overlay show" id="overlay-menu">
   <div class="card">
-    <h1>SOLMAR BAY</h1>
-    <p>Rico Vega owes fixer Marisol Kane <b>$5,000</b>. One sunset city, four missions, and every cop in Solmar Bay between you and the pier.</p>
+    <h1>SOLMAR <span class="bay">BAY</span></h1>
+    <p>Rico Vega owes fixer Marisol Kane <b>$5,000</b>. Four jobs clear the debt: pay her back a little, steal a sports car, lose a three-star wanted level, then deliver the car at the pier.</p>
+    <p class="sub">A sunset coastal city. Drive, run, punch, shoot — and stay out of the cells.</p>
     <div class="controls">
-      <b>WASD</b> — walk &nbsp;·&nbsp; <b>Mouse</b> — look &nbsp;·&nbsp; <b>Shift</b> — run<br>
-      <b>E</b> — enter / exit car &nbsp;·&nbsp; <b>W/S</b> — drive &nbsp;·&nbsp; <b>A/D</b> — steer<br>
-      <b>Space</b> — handbrake &nbsp;·&nbsp; <b>Click</b> — shoot &nbsp;·&nbsp; <b>F</b> — punch<br>
-      <b>M</b> — mute &nbsp;·&nbsp; <b>P</b> — pause
+      <b>W A S D</b> — move / drive &nbsp;·&nbsp; <b>Shift</b> — run<br />
+      <b>E</b> — enter a car, pay Marisol, get out<br />
+      <b>Space</b> / click — shoot &nbsp;·&nbsp; <b>F</b> — punch<br />
+      <b>P</b> — pause
     </div>
-    <p>Follow the yellow beacon. Lose the cops. Pay the debt.</p>
-    <button id="btn-start">START ENGINE</button>
+    <div>
+      <button class="btn" id="btn-start" type="button">Start engine</button>
+      <button class="btn secondary" id="btn-continue" type="button" style="display:none">Continue</button>
+    </div>
   </div>
 </div>
 
-<div id="screen-pause" class="overlay" style="display:none">
+<div class="overlay" id="overlay-end">
   <div class="card">
-    <h2>PAUSED</h2>
-    <p>Solmar Bay waits for no one. Well — except right now.</p>
-    <button id="btn-resume">RESUME</button><br>
-    <button id="btn-restart" style="background:linear-gradient(180deg,#888,#555);color:#fff;font-size:14px;padding:10px 28px;">RESTART (CLEAR SAVE)</button>
+    <h2 id="end-title">BUSTED</h2>
+    <p id="end-text">The cops caught Rico.</p>
+    <div><button class="btn" id="btn-again" type="button">Play again</button></div>
   </div>
 </div>
 
-<div id="screen-end" class="overlay" style="display:none">
-  <div class="card">
-    <h2 id="end-title">BUSTED!</h2>
-    <p id="end-text"></p>
-    <button id="btn-end">Continue</button>
-  </div>
-</div>
-
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.min.js"
+  }
+}
+</script>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>

@@ -1,134 +1,114 @@
-// SOLMAR BAY — the four story missions from fixer Marisol Kane.
-// game facade: city, setObjective, setMissionTitle, message, addMoney, setWanted,
-// spawnTargetCar, getPlayerPos, isPlayerInCar, completeStory, save, audio.
-export const MISSION_DEFS = [
-  {
-    title: 'The Debt',
-    reward: 200,
-    brief: 'Marisol Kane wants to see you. Drive to her office downtown and meet her.',
-  },
-  {
-    title: 'Hot Wheels',
-    reward: 500,
-    time: 90,
-    brief: 'Steal the red sport car parked on 60th and bring it to the garage. You have 90 seconds.',
-  },
-  {
-    title: 'Heat',
-    reward: 300,
-    time: 60,
-    brief: 'The cops are all over you. Lose the 3-star wanted level — survive 60 seconds without getting busted.',
-  },
-  {
-    title: 'Payoff',
-    reward: 0,
-    brief: 'Bring the money to the pier and pay Marisol the $5,000. She will not wait.',
-  },
-];
+// The story: Rico Vega owes the fixer Marisol Kane $5,000, and four jobs clear it.
+// Each mission has a title, an objective line and a waypoint with a beacon over
+// it; the game drives the state machine and asks here whether a job is done.
+import * as THREE from 'three';
 
-function dist2d(a, b) {
-  return Math.hypot(a.x - b.x, a.z - b.z);
-}
+export function createMissions(scene, city) {
+  const beaconMat = new THREE.MeshBasicMaterial({
+    color: 0xffd34d,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const beacon = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 70, 20, 1, true), beaconMat);
+  const marker = new THREE.Mesh(
+    new THREE.OctahedronGeometry(2.1),
+    new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.9 }),
+  );
+  scene.add(beacon);
+  scene.add(marker);
 
-export function createMissions(game) {
-  const m = {
+  const list = [
+    {
+      title: 'The Debt',
+      objective: "Drive to Marisol's office and pay her $200. Press E at the door.",
+      waypoint: city.officeDoor,
+      pay: 200,
+    },
+    {
+      title: 'Hot Wheels',
+      objective: 'Steal the red sports car parked by the beach.',
+      waypoint: new THREE.Vector3(city.sportsSpot.x, 0, city.sportsSpot.z),
+      carId: 'target',
+    },
+    {
+      title: 'Getaway',
+      objective: 'Lose the 3-star wanted level. Outrun the cops and stay clean.',
+      waypoint: null,
+    },
+    {
+      title: 'Payoff',
+      objective: 'Deliver the sports car to the pier garage.',
+      waypoint: city.garageSpot,
+      carId: 'target',
+    },
+  ];
+
+  const missions = {
+    list,
     index: 0,
-    active: false,
-    timer: 0,
-    waypoint: null,
-    targetCar: null,
-    retryIn: 0,
-
+    get current() {
+      return list[missions.index];
+    },
+    get done() {
+      return missions.index >= list.length;
+    },
+    /** Point the beacon at the current job (hidden when the job has no place). */
     start(i) {
-      m.index = i;
-      m.active = true;
-      m.retryIn = 0;
-      const def = MISSION_DEFS[i];
-      game.setMissionTitle('Mission ' + (i + 1) + '/4 — ' + def.title);
-      game.setObjective(def.brief);
-      game.message('New mission: ' + def.title);
-      game.audio.mission();
-      if (i === 0) {
-        m.waypoint = { x: game.city.spots.office.x, z: game.city.spots.office.z };
-        m.timer = 0;
-      } else if (i === 1) {
-        m.targetCar = game.spawnTargetCar();
-        m.waypoint = null;
-        m.timer = def.time;
-      } else if (i === 2) {
-        game.setWanted(3);
-        m.waypoint = null;
-        m.timer = def.time;
-      } else if (i === 3) {
-        m.waypoint = { x: game.city.spots.pier.x, z: game.city.spots.pier.z };
-        game.setWanted(2);
-        m.timer = 0;
+      missions.index = i;
+      const m = list[i];
+      if (m && m.waypoint) {
+        beacon.visible = true;
+        marker.visible = true;
+        beacon.position.set(m.waypoint.x, 35, m.waypoint.z);
+        marker.position.set(m.waypoint.x, 9, m.waypoint.z);
+      } else {
+        beacon.visible = false;
+        marker.visible = false;
       }
+      return m;
     },
-
-    update(dt) {
-      if (m.retryIn > 0) {
-        m.retryIn -= dt;
-        if (m.retryIn <= 0) m.start(m.index);
-        return;
+    /** Is the player close enough to the current waypoint to act on it? */
+    nearWaypoint(pos, radius) {
+      const m = missions.current;
+      if (!m || !m.waypoint) return false;
+      return Math.hypot(pos.x - m.waypoint.x, pos.z - m.waypoint.z) < radius;
+    },
+    /**
+     * The E key at a waypoint: paying Marisol. Returns true when it completed a job.
+     * `state` is { pos, cash }.
+     */
+    interact(state) {
+      const m = missions.current;
+      if (!m || m.pay === undefined) return false;
+      if (!missions.nearWaypoint(state.pos, 8)) return false;
+      if (state.cash < m.pay) return false;
+      return true;
+    },
+    /**
+     * Has the current job finished on its own? `state` is
+     * { pos, inCar, carId, wanted }. Returns true when it has.
+     */
+    check(state) {
+      const m = missions.current;
+      if (!m) return false;
+      if (m.carId === 'target' && m.waypoint && m.title === 'Hot Wheels') {
+        return state.inCar && state.carId === 'target';
       }
-      if (!m.active) return;
-      const pp = game.getPlayerPos();
-      if (m.index === 0) {
-        if (m.waypoint && dist2d(pp, m.waypoint) < 6) m.complete();
-      } else if (m.index === 1) {
-        m.timer -= dt;
-        if (m.timer <= 0) {
-          m.fail('Too slow — the garage deal fell through.');
-          return;
-        }
-        if (m.targetCar) {
-          const inTarget = game.isPlayerInCar(m.targetCar);
-          if (inTarget) m.waypoint = { x: game.city.spots.garage.x, z: game.city.spots.garage.z };
-          else m.waypoint = { x: m.targetCar.group.position.x, z: m.targetCar.group.position.z };
-          if (inTarget && dist2d(pp, game.city.spots.garage) < 7) m.complete();
-        }
-      } else if (m.index === 2) {
-        m.timer -= dt;
-        if (m.timer <= 0) m.complete();
-      } else if (m.index === 3) {
-        if (m.waypoint && dist2d(pp, m.waypoint) < 6) m.complete();
+      if (m.title === 'Getaway') {
+        return state.wanted === 0;
       }
-    },
-
-    complete() {
-      const def = MISSION_DEFS[m.index];
-      if (def.reward) game.addMoney(def.reward);
-      game.message('Mission complete: ' + def.title + (def.reward ? ' (+$' + def.reward + ')' : ''));
-      game.audio.mission();
-      m.active = false;
-      m.waypoint = null;
-      m.targetCar = null;
-      m.index += 1;
-      game.save();
-      if (m.index >= MISSION_DEFS.length) {
-        game.completeStory();
-        return;
+      if (m.carId === 'target' && m.title === 'Payoff') {
+        return state.inCar && state.carId === 'target' && missions.nearWaypoint(state.pos, 8);
       }
-      m.start(m.index);
+      return false;
     },
-
-    fail(reason) {
-      game.message(reason);
-      game.audio.fail();
-      game.setWanted(0);
-      m.active = false;
-      m.waypoint = null;
-      m.targetCar = null;
-      m.retryIn = 1.5;
-    },
-
-    /** Called when the player is busted or wasted mid-mission. */
-    onBusted() {
-      if (!m.active) return;
-      if (m.index === 2) m.fail('Busted — the Heat is back on.');
-      else if (m.index === 3) m.fail('Busted — Marisol is not happy.');
+    update(dt, t) {
+      if (!marker.visible) return;
+      marker.rotation.y += dt * 1.4;
+      marker.position.y = 9 + Math.sin(t * 2.2) * 0.8;
     },
   };
-  return m;
+  return missions;
 }
