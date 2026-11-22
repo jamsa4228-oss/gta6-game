@@ -1,186 +1,141 @@
-// HUD: health, money, wanted stars, mission objective, messages, a live
-// canvas minimap (roads, buildings, player, cars, police, mission marker),
-// and the overlays: start, pause, wasted/busted, story complete.
-export function createHud(callbacks) {
-  const el = (id) => document.getElementById(id);
-  const minimap = el('minimap');
-  const mctx = minimap.getContext('2d');
-  let messageTimer = 0;
+// SOLMAR BAY — HUD: health, money, wanted stars, speed, objective, feed, minimap.
+export function createHud() {
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    health: $('hud-health-fill'),
+    healthText: $('hud-health-text'),
+    money: $('hud-money'),
+    debt: $('hud-debt'),
+    stars: $('hud-stars'),
+    speed: $('hud-speed'),
+    objective: $('hud-objective'),
+    missionTitle: $('hud-mission'),
+    feed: $('hud-feed'),
+    minimap: $('minimap'),
+    start: $('screen-start'),
+    pause: $('screen-pause'),
+    end: $('screen-end'),
+    endTitle: $('end-title'),
+    endText: $('end-text'),
+    endBtn: $('btn-end'),
+  };
+  const mctx = el.minimap.getContext('2d');
+  const feedItems = [];
+  let pulse = 0;
 
-  function setText(id, text) {
-    const node = el(id);
-    if (node) node.textContent = text;
-  }
-
-  return {
+  const hud = {
     setHealth(hp) {
-      setText('health-value', String(Math.max(0, Math.round(hp))));
-      const fill = el('health-fill');
-      if (fill) {
-        fill.style.width = `${Math.max(0, Math.min(100, hp))}%`;
-        fill.classList.toggle('low', hp <= 30);
-      }
+      el.health.style.width = Math.max(0, hp) + '%';
+      el.healthText.textContent = String(Math.ceil(Math.max(0, hp)));
     },
-    setMoney(amount) {
-      setText('money-value', `$${Math.round(amount).toLocaleString('en-US')}`);
+    setMoney(money, debt) {
+      el.money.textContent = '$' + money.toLocaleString('en-US');
+      el.debt.textContent = 'Debt: $' + debt.toLocaleString('en-US');
     },
-    setWanted(level) {
-      const stars = el('wanted-stars');
-      if (!stars) return;
-      let html = '';
-      for (let i = 0; i < 5; i += 1) html += i < level ? '★' : '☆';
-      stars.innerHTML = html;
-      stars.classList.toggle('hot', level > 0);
+    setStars(n) {
+      let s = '';
+      for (let i = 0; i < 5; i++) s += i < n ? '★' : '☆';
+      el.stars.textContent = s;
+      el.stars.style.color = n > 0 ? '#ffd23e' : '#555';
     },
-    setAmmo(mag, magSize, reloading) {
-      setText('ammo-value', reloading ? 'RELOADING' : `${mag} / ${magSize}`);
+    setSpeed(kmh) {
+      el.speed.textContent = Math.round(kmh) + ' km/h';
     },
-    setSpeed(kmh, driving) {
-      setText('speed-value', driving ? `${Math.round(Math.abs(kmh))} km/h` : '');
+    setObjective(t) {
+      el.objective.textContent = t || '';
     },
-    setMission(title, objective) {
-      setText('mission-title', title);
-      setText('mission-objective', objective);
+    setMissionTitle(t) {
+      el.missionTitle.textContent = t || '';
     },
-    showMessage(text, seconds = 3) {
-      const node = el('message');
-      if (!node) return;
-      node.textContent = text;
-      node.hidden = false;
-      messageTimer = seconds;
+    message(text) {
+      feedItems.unshift(text);
+      if (feedItems.length > 5) feedItems.pop();
+      el.feed.innerHTML = feedItems.map((m) => '<div>' + m + '</div>').join('');
     },
-    tickMessage(dt) {
-      if (messageTimer > 0) {
-        messageTimer -= dt;
-        if (messageTimer <= 0) {
-          const node = el('message');
-          if (node) node.hidden = true;
-        }
-      }
+    show(name) {
+      el.start.style.display = name === 'start' ? 'flex' : 'none';
+      el.pause.style.display = name === 'pause' ? 'flex' : 'none';
+      el.end.style.display = name === 'end' ? 'flex' : 'none';
     },
-    setHint(text) {
-      setText('hint', text);
+    showEnd(title, text, btnLabel) {
+      el.endTitle.textContent = title;
+      el.endText.textContent = text;
+      el.endBtn.textContent = btnLabel || 'Continue';
+      hud.show('end');
     },
-    // Minimap: 170x170, city spans -160..+190 in both axes.
-    drawMinimap({ player, cars, police, peds, missionTarget, landmarks, inCar }) {
-      const W = minimap.width;
-      const H = minimap.height;
-      const min = -165;
-      const max = 195;
-      const toMap = (x, z) => [
-        ((x - min) / (max - min)) * W,
-        ((z - min) / (max - min)) * H,
-      ];
-      mctx.clearRect(0, 0, W, H);
-      mctx.fillStyle = '#20262b';
-      mctx.fillRect(0, 0, W, H);
-      // Sea (south).
-      const [, seaY] = toMap(0, 150);
-      mctx.fillStyle = '#2e7fa8';
-      mctx.fillRect(0, seaY, W, H - seaY);
+    drawMinimap(state, dt) {
+      pulse += dt || 0.016;
+      const c = mctx;
+      const S = 180;
+      const scale = S / 320;
+      const toX = (x) => (x + 160) * scale;
+      const toZ = (z) => (z + 160) * scale;
+      c.fillStyle = '#0d1420';
+      c.fillRect(0, 0, S, S);
+      // Sea on the west edge.
+      c.fillStyle = '#14507e';
+      c.fillRect(0, 0, toX(-150), S);
       // Roads.
-      mctx.strokeStyle = '#5a5e64';
-      mctx.lineWidth = 4;
-      for (const c of [-120, -72, -24, 24, 72, 120]) {
-        const [x] = toMap(c, 0);
-        mctx.beginPath(); mctx.moveTo(x, 0); mctx.lineTo(x, H); mctx.stroke();
-        const [, z] = toMap(0, c);
-        mctx.beginPath(); mctx.moveTo(0, z); mctx.lineTo(W, z); mctx.stroke();
+      c.strokeStyle = '#5a5a60';
+      c.lineWidth = 7;
+      for (const r of [-120, -60, 0, 60, 120]) {
+        c.beginPath();
+        c.moveTo(toX(r), 0);
+        c.lineTo(toX(r), S);
+        c.stroke();
+        c.beginPath();
+        c.moveTo(0, toZ(r));
+        c.lineTo(S, toZ(r));
+        c.stroke();
       }
-      // Landmark dots.
-      mctx.fillStyle = '#d8b62a';
-      for (const key of ['garage', 'hotel', 'safehouse', 'bank']) {
-        const lm = landmarks[key];
-        if (!lm) continue;
-        const [x, z] = toMap(lm.x, lm.z);
-        mctx.beginPath(); mctx.arc(x, z, 3, 0, Math.PI * 2); mctx.fill();
+      // Pier.
+      c.strokeStyle = '#8a6a4a';
+      c.lineWidth = 4;
+      c.beginPath();
+      c.moveTo(toX(-150), toZ(0));
+      c.lineTo(toX(-210), toZ(0));
+      c.stroke();
+      // Traffic dots.
+      c.fillStyle = '#9a9a9a';
+      for (const t of state.traffic || []) {
+        c.fillRect(toX(t.x) - 1.5, toZ(t.z) - 1.5, 3, 3);
       }
-      // Mission marker: pulsing yellow diamond.
-      if (missionTarget) {
-        const [x, z] = toMap(missionTarget.x, missionTarget.z);
-        const pulse = 5 + Math.sin(performance.now() / 200) * 2;
-        mctx.fillStyle = '#ffd83a';
-        mctx.beginPath();
-        mctx.moveTo(x, z - pulse); mctx.lineTo(x + pulse, z); mctx.lineTo(x, z + pulse); mctx.lineTo(x - pulse, z);
-        mctx.closePath(); mctx.fill();
+      // Police dots.
+      for (const p of state.police || []) {
+        c.fillStyle = p.kind === 'foot' ? '#ff4040' : '#ff2020';
+        c.beginPath();
+        c.arc(toX(p.x), toZ(p.z), p.kind === 'foot' ? 2.5 : 3.5, 0, Math.PI * 2);
+        c.fill();
       }
-      // Traffic cars: white dots.
-      mctx.fillStyle = '#e8e8e8';
-      for (const car of cars) {
-        const [x, z] = toMap(car.state.x, car.state.z);
-        mctx.fillRect(x - 1.5, z - 1.5, 3, 3);
+      // Waypoint: pulsing yellow diamond.
+      if (state.waypoint) {
+        const wx = toX(state.waypoint.x);
+        const wz = toZ(state.waypoint.z);
+        const r = 5 + Math.sin(pulse * 5) * 2;
+        c.fillStyle = '#ffd23e';
+        c.beginPath();
+        c.moveTo(wx, wz - r);
+        c.lineTo(wx + r, wz);
+        c.lineTo(wx, wz + r);
+        c.lineTo(wx - r, wz);
+        c.closePath();
+        c.fill();
       }
-      // Police: blue/red dots.
-      for (const car of police) {
-        const [x, z] = toMap(car.state.x, car.state.z);
-        mctx.fillStyle = '#4a86ff';
-        mctx.beginPath(); mctx.arc(x, z, 3, 0, Math.PI * 2); mctx.fill();
-      }
-      // Player: white triangle pointing along heading.
-      const [px, pz] = toMap(player.x, player.z);
-      mctx.save();
-      mctx.translate(px, pz);
-      mctx.rotate(player.heading);
-      mctx.fillStyle = inCar ? '#ff8c2a' : '#ffffff';
-      mctx.beginPath();
-      mctx.moveTo(0, -7); mctx.lineTo(5, 6); mctx.lineTo(-5, 6);
-      mctx.closePath(); mctx.fill();
-      mctx.restore();
-      // North tick.
-      mctx.fillStyle = '#8a94a0';
-      mctx.font = '10px sans-serif';
-      mctx.fillText('N', 6, 12);
-    },
-    showOverlay(kind, data = {}) {
-      const overlay = el('overlay');
-      const title = el('overlay-title');
-      const copy = el('overlay-copy');
-      const play = el('play');
-      if (!overlay || !title || !copy || !play) return;
-      overlay.hidden = false;
-      if (kind === 'start') {
-        title.innerHTML = 'SOLMAR <span class="amber">BAY</span>';
-        copy.textContent = 'A sun-soaked coastal city. Rico Vega owes the fixer Marisol Kane $5,000 — four jobs stand between him and a clean slate. Steal a car, run the package, lose the heat, make the payoff.';
-        play.textContent = data.hasSave ? 'Continue — $' + Math.round(data.saveMoney || 0) : 'Start the story';
-        el('overlay-sub').hidden = false;
-      } else if (kind === 'paused') {
-        title.textContent = 'PAUSED';
-        copy.textContent = 'Take a breath, Rico. The city waits.';
-        play.textContent = 'Resume';
-        el('overlay-sub').hidden = true;
-      } else if (kind === 'wasted') {
-        title.textContent = 'WASTED';
-        copy.textContent = data.reason || 'Rico went down. The hospital patched him up — minus $500.';
-        play.textContent = 'Get back up';
-        el('overlay-sub').hidden = true;
-      } else if (kind === 'busted') {
-        title.textContent = 'BUSTED';
-        copy.textContent = 'The Solmar Bay PD took Rico in. Bail cost $500 — and the heat is off, for now.';
-        play.textContent = 'Walk free';
-        el('overlay-sub').hidden = true;
-      } else if (kind === 'story') {
-        title.innerHTML = 'DEBT <span class="amber">PAID</span>';
-        copy.textContent = `All four jobs done. Rico is square with Marisol Kane — $${Math.round(data.money || 0)} in his pocket and the whole of Solmar Bay ahead of him. Free roam continues.`;
-        play.textContent = 'Keep driving';
-        el('overlay-sub').hidden = true;
-      }
-      el('overlay').dataset.kind = kind;
-    },
-    hideOverlay() {
-      const overlay = el('overlay');
-      if (overlay) overlay.hidden = true;
-    },
-    overlayKind() {
-      const overlay = el('overlay');
-      return overlay ? overlay.dataset.kind : null;
-    },
-    onPlay(fn) {
-      const play = el('play');
-      if (play) play.addEventListener('click', fn);
-    },
-    setSaveButton(hasSave, money) {
-      const btn = el('play');
-      if (btn && hasSave) btn.textContent = `Continue — $${Math.round(money || 0)}`;
+      // Player arrow.
+      const px = toX(state.px);
+      const pz = toZ(state.pz);
+      const a = state.heading || 0;
+      c.fillStyle = '#ffffff';
+      c.strokeStyle = '#111111';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(px + Math.sin(a) * 7, pz + Math.cos(a) * 7);
+      c.lineTo(px + Math.sin(a + 2.5) * 5, pz + Math.cos(a + 2.5) * 5);
+      c.lineTo(px + Math.sin(a - 2.5) * 5, pz + Math.cos(a - 2.5) * 5);
+      c.closePath();
+      c.fill();
+      c.stroke();
     },
   };
+  return hud;
 }

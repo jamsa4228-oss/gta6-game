@@ -1,78 +1,75 @@
-// Keyboard and mouse. Pointer lock turns the mouse into a camera orbit;
-// dragging without lock orbits too, so the game plays without lock.
-// Tracks single-press keys so logic can consume them exactly once.
-export function createInput(canvas, onLockChange) {
-  const keys = new Set();
-  const pressed = new Set();
-  const state = { keys, locked: false, lookX: 0, lookY: 0, firing: false };
-  let dragging = false;
+// SOLMAR BAY — keyboard + mouse input (pointer lock).
+export function createInput(canvas) {
+  const input = {
+    keys: Object.create(null),
+    mouseDX: 0,
+    mouseDY: 0,
+    mouseDown: false,
+    mouseClicked: false,
+    locked: false,
+  };
 
-  function setKey(event, down) {
-    if (down) {
-      if (!keys.has(event.code)) pressed.add(event.code);
-      keys.add(event.code);
-    } else {
-      keys.delete(event.code);
-    }
-    if (event.code === 'Space') event.preventDefault();
-  }
-
-  window.addEventListener('keydown', (event) => setKey(event, true));
-  window.addEventListener('keyup', (event) => setKey(event, false));
-  window.addEventListener('blur', () => {
-    keys.clear();
-    pressed.clear();
-    state.firing = false;
-    dragging = false;
+  window.addEventListener('keydown', (e) => {
+    input.keys[e.code] = true;
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   });
-  window.addEventListener('mousemove', (event) => {
-    if (state.locked) {
-      state.lookX += event.movementX;
-      state.lookY += event.movementY;
-    } else if (dragging) {
-      state.lookX += event.movementX;
-      state.lookY += event.movementY;
+  window.addEventListener('keyup', (e) => {
+    input.keys[e.code] = false;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement === canvas) {
+      input.mouseDX += e.movementX || 0;
+      input.mouseDY += e.movementY || 0;
     }
   });
-  window.addEventListener('mousedown', (event) => {
-    if (event.button === 0) {
-      state.firing = true;
-      dragging = true;
+  window.addEventListener('mousedown', (e) => {
+    if (e.button === 0) {
+      input.mouseDown = true;
+      input.mouseClicked = true;
     }
   });
-  window.addEventListener('mouseup', (event) => {
-    if (event.button === 0) {
-      state.firing = false;
-      dragging = false;
-    }
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 0) input.mouseDown = false;
   });
   document.addEventListener('pointerlockchange', () => {
-    state.locked = document.pointerLockElement === canvas;
-    if (onLockChange) onLockChange(state.locked);
+    input.locked = document.pointerLockElement === canvas;
+  });
+  canvas.addEventListener('click', () => {
+    if (document.pointerLockElement !== canvas) {
+      try {
+        canvas.requestPointerLock();
+      } catch (err) {
+        /* pointer lock unavailable in this browser */
+      }
+    }
   });
 
-  return {
-    state,
-    requestLock() {
-      if (document.pointerLockElement !== canvas) {
-        canvas.requestPointerLock();
-      }
-    },
-    takeLook() {
-      const look = { x: state.lookX, y: state.lookY };
-      state.lookX = 0;
-      state.lookY = 0;
-      return look;
-    },
-    wasPressed(code) {
-      if (pressed.has(code)) {
-        pressed.delete(code);
-        return true;
-      }
-      return false;
-    },
-    clearPressed() {
-      pressed.clear();
-    },
+  input.requestLock = () => {
+    try {
+      canvas.requestPointerLock();
+    } catch (err) {
+      /* ignore */
+    }
   };
+  input.consumeMouse = () => {
+    const dx = input.mouseDX;
+    const dy = input.mouseDY;
+    input.mouseDX = 0;
+    input.mouseDY = 0;
+    return { dx, dy };
+  };
+  input.consumeClick = () => {
+    const c = input.mouseClicked;
+    input.mouseClicked = false;
+    return c;
+  };
+  input.axis = () => {
+    const k = input.keys;
+    return {
+      x: (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0),
+      y: (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0),
+    };
+  };
+  input.pressed = (code) => !!input.keys[code];
+  return input;
 }
